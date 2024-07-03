@@ -1,5 +1,4 @@
 use log::debug;
-use log::trace;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -12,7 +11,7 @@ pub struct UserRecord {
 
 impl UserRecord {
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        trace!("Converting bytes to UserRecord");
+        debug!("Converting bytes to UserRecord");
 
         let username = {
             let mut array = [0u8; 32];
@@ -41,5 +40,14 @@ impl UserRecord {
             download_speed,
             upload_speed,
         }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&self.username);
+        bytes.extend_from_slice(&self.command);
+        bytes.extend_from_slice(&self.download_speed.to_ne_bytes());
+        bytes.extend_from_slice(&self.upload_speed.to_ne_bytes());
+        bytes
     }
 }

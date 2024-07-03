@@ -1,14 +1,11 @@
 use clap::{Arg, Command};
-use std::thread;
-
-use tokio::time::Duration;
 use crate::ipc::Ipc;
 use crate::Arc;
 
 pub fn get_matches() -> clap::ArgMatches {
     Command::new("RouilleSpy")
-        .version("0.01")
-        .author("thegug>")
+        .version("1.0")
+        .author("Your Name <your@email.com>")
         .about("Displays user records from IPC memory")
         .arg(
             Arg::new("ipc_key")
@@ -48,6 +45,6 @@ pub fn run_cli(ipc: Arc<Ipc>) {
                 record.upload_speed
             );
         }
-        thread::sleep(Duration::from_secs(1)); // Update every 1 second
+        std::thread::sleep(std::time::Duration::from_secs(1)); // Update every 1 second
     }
 }

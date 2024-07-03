@@ -1,4 +1,4 @@
-use eframe::{egui, NativeOptions};
+use eframe::egui;
 
 use crate::ipc::Ipc;
 use crate::user_record::UserRecord;

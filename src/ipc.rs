@@ -1,6 +1,9 @@
-use std::num::ParseIntError;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+
+use crate::user_record::UserRecord;
+use log::{debug, error, info, trace};
+use std::num::ParseIntError;
 
 #[derive(Debug, Error)]
 pub enum IpcError {
@@ -13,57 +16,46 @@ pub enum IpcError {
 #[derive(Clone)]
 pub struct Ipc {
     pub ipc_key: String,
-    pub memory: Arc<Mutex<Vec<u8>>>, // Use a Vec<u8> wrapped in Arc<Mutex>> for shared memory
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct UserRecord {
-    pub username: [u8; 32],  // Fixed-size array for username (32 bytes)
-    pub command: [u8; 32],   // Fixed-size array for command (32 bytes)
-    pub download_speed: f32, // Download speed
-    pub upload_speed: f32,   // Upload speed
-}
-
-impl UserRecord {
-    fn from_bytes(bytes: &[u8]) -> Self {
-        let username = {
-            let mut array = [0u8; 32];
-            array.copy_from_slice(&bytes[0..32]);
-            array
-        };
-        let command = {
-            let mut array = [0u8; 32];
-            array.copy_from_slice(&bytes[32..64]);
-            array
-        };
-        let download_speed = f32::from_ne_bytes([bytes[64], bytes[65], bytes[66], bytes[67]]);
-        let upload_speed = f32::from_ne_bytes([bytes[68], bytes[69], bytes[70], bytes[71]]);
-
-        UserRecord {
-            username,
-            command,
-            download_speed,
-            upload_speed,
-        }
-    }
-
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(&self.username);
-        bytes.extend_from_slice(&self.command);
-        bytes.extend_from_slice(&self.download_speed.to_ne_bytes());
-        bytes.extend_from_slice(&self.upload_speed.to_ne_bytes());
-        bytes
-    }
+    pub memory: Arc<Mutex<Vec<u8>>>,
 }
 
 impl Ipc {
-    pub fn new(ipc_key: String) -> Self {
-        // Simulate shared memory with a Vec<u8>
-        let memory = Arc::new(Mutex::new(vec![0; 1024])); // Adjust size as needed
+    pub fn new(ipc_key: &str) -> Result<Self, IpcError> {
+        trace!("Creating new IPC instance with key: {}", ipc_key);
 
-        Self { ipc_key, memory }
+        if !ipc_key.starts_with("0x") {
+            error!("Invalid IPC key format: {}", ipc_key);
+            return Err(IpcError::InvalidKeyFormat);
+        }
+
+        u32::from_str_radix(&ipc_key[2..], 16)?; // Validate key format
+
+        let memory = Arc::new(Mutex::new(vec![0; 1024])); // Simulate shared memory
+
+        info!("IPC instance created with key: {}", ipc_key);
+        Ok(Self {
+            ipc_key: ipc_key.to_string(),
+            memory,
+        })
+    }
+
+    pub fn read_user_records(&self) -> Vec<UserRecord> {
+        trace!("Reading user records from IPC memory");
+
+        let memory = self.memory.lock().unwrap();
+        let mut records = Vec::new();
+
+        for chunk in memory.chunks_exact(72) {
+            // Each record is 72 bytes
+            if chunk.iter().any(|&byte| byte != 0) {
+                // Skip empty records
+                let record = UserRecord::from_bytes(chunk);
+                records.push(record);
+            }
+        }
+
+        debug!("Read {} user records", records.len());
+        records
     }
 
     pub fn write_user_record(&self, record: UserRecord) {
@@ -72,19 +64,6 @@ impl Ipc {
         for (i, &byte) in bytes.iter().enumerate() {
             memory[i] = byte;
         }
-    }
-
-    pub fn read_user_records(&self) -> Vec<UserRecord> {
-        let memory = self.memory.lock().unwrap();
-        let mut records = Vec::new();
-
-        for chunk in memory.chunks_exact(72) {
-            // Each record is 72 bytes
-            let record = UserRecord::from_bytes(chunk);
-            records.push(record);
-        }
-
-        records
     }
 }
 
